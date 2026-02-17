@@ -12,130 +12,119 @@ def analytics_dashboard(filters: FilterPayload):
 
     query = build_query(filters)
 
-    # ---------------- KPI ----------------
-    kpi_pipeline = [
+    pipeline = [
+
         {"$match": query},
+
         {
-            "$group": {
-                "_id": None,
-                "total_revenue": {"$sum": "$Revenue"},
-                "total_orders": {"$sum": 1},
-                "units_sold": {"$sum": "$Units_Sold"},
-                "total_profit": {"$sum": "$Profit"}
+            "$facet": {
+
+                # ---------------- KPI ----------------
+                "kpis": [
+                    {
+                        "$group": {
+                            "_id": None,
+                            "total_revenue": {"$sum": "$Revenue"},
+                            "total_orders": {"$sum": 1},
+                            "units_sold": {"$sum": "$Units_Sold"},
+                            "total_profit": {"$sum": "$Profit"}
+                        }
+                    }
+                ],
+
+                # ---------------- Revenue Trend ----------------
+                "revenue_trend": [
+                    {
+                        "$group": {
+                            "_id": "$Order_Date",
+                            "revenue": {"$sum": "$Revenue"}
+                        }
+                    },
+                    {"$sort": {"_id": 1}}
+                ],
+
+                # ---------------- Category Share ----------------
+                "category_share": [
+                    {
+                        "$group": {
+                            "_id": "$Category",
+                            "revenue": {"$sum": "$Revenue"}
+                        }
+                    }
+                ],
+
+                # ---------------- Top SKUs ----------------
+                "top_skus": [
+                    {
+                        "$group": {
+                            "_id": "$SKU",
+                            "units_sold": {"$sum": "$Units_Sold"},
+                            "revenue": {"$sum": "$Revenue"}
+                        }
+                    },
+                    {"$sort": {"units_sold": -1}},
+                    {"$limit": 10}
+                ],
+
+                # ---------------- State Heatmap ----------------
+                "state_heatmap": [
+                    {
+                        "$group": {
+                            "_id": "$State",
+                            "revenue": {"$sum": "$Revenue"}
+                        }
+                    }
+                ],
+
+                # ---------------- Customer Analytics ----------------
+                "customer_analytics": [
+                    {
+                        "$group": {
+                            "_id": "$Customer_ID",
+                            "orders": {"$sum": 1},
+                            "revenue": {"$sum": "$Revenue"}
+                        }
+                    }
+                ],
+
+                # ---------------- Profit Analytics ----------------
+                "profit_analytics": [
+                    {
+                        "$group": {
+                            "_id": "$Category",
+                            "profit": {"$sum": "$Profit"},
+                            "revenue": {"$sum": "$Revenue"}
+                        }
+                    }
+                ],
+
+                # ---------------- Fulfillment Analytics ----------------
+                "fulfillment_analytics": [
+                    {
+                        "$group": {
+                            "_id": "$Fulfillment_Type",
+                            "orders": {"$sum": 1},
+                            "profit": {"$sum": "$Profit"}
+                        }
+                    }
+                ]
+
             }
         }
     ]
-    kpis = list(sales.aggregate(kpi_pipeline))
-    kpis = kpis[0] if kpis else {}
 
-    # ---------------- Revenue Trend ----------------
-    revenue_pipeline = [
-        {"$match": query},
-        {
-            "$group": {
-                "_id": "$Order_Date",
-                "revenue": {"$sum": "$Revenue"}
-            }
-        },
-        {"$sort": {"_id": 1}}
-    ]
-    revenue_trend = list(sales.aggregate(revenue_pipeline))
+    result = list(sales.aggregate(pipeline))[0]
 
-    # ---------------- Category Share ----------------
-    category_pipeline = [
-        {"$match": query},
-        {
-            "$group": {
-                "_id": "$Category",
-                "revenue": {"$sum": "$Revenue"}
-            }
-        }
-    ]
-    category_share = list(sales.aggregate(category_pipeline))
-
-    # ---------------- Top SKUs ----------------
-    sku_pipeline = [
-        {"$match": query},
-        {
-            "$group": {
-                "_id": "$SKU",
-                "units_sold": {"$sum": "$Units_Sold"},
-                "revenue": {"$sum": "$Revenue"}
-            }
-        },
-        {"$sort": {"units_sold": -1}},
-        {"$limit": 10}
-    ]
-    top_skus = list(sales.aggregate(sku_pipeline))
-
-    # ---------------- State Heatmap ----------------
-    state_pipeline = [
-        {"$match": query},
-        {
-            "$group": {
-                "_id": "$State",
-                "revenue": {"$sum": "$Revenue"}
-            }
-        }
-    ]
-    state_heatmap = list(sales.aggregate(state_pipeline))
-
-    # ---------------- Customer Analytics ----------------
-    customer_pipeline = [
-        {"$match": query},
-        {
-            "$group": {
-                "_id": "$Customer_ID",
-                "orders": {"$sum": 1},
-                "revenue": {"$sum": "$Revenue"}
-            }
-        }
-    ]
-    customer_data = list(sales.aggregate(customer_pipeline))
-
-    repeat_customers = len([c for c in customer_data if c["orders"] > 1])
-    total_customers = len(customer_data)
-
-    customer_analytics = {
-        "total_customers": total_customers,
-        "repeat_customers": repeat_customers
-    }
-
-    # ---------------- Profit Analytics ----------------
-    profit_pipeline = [
-        {"$match": query},
-        {
-            "$group": {
-                "_id": "$Category",
-                "profit": {"$sum": "$Profit"},
-                "revenue": {"$sum": "$Revenue"}
-            }
-        }
-    ]
-    profit_analytics = list(sales.aggregate(profit_pipeline))
-
-    # ---------------- Fulfillment Analytics ----------------
-    fulfillment_pipeline = [
-        {"$match": query},
-        {
-            "$group": {
-                "_id": "$Fulfillment_Type",
-                "orders": {"$sum": 1},
-                "profit": {"$sum": "$Profit"}
-            }
-        }
-    ]
-    fulfillment_analytics = list(sales.aggregate(fulfillment_pipeline))
-
-    # ---------------- FINAL RESPONSE ----------------
+    # Post-processing KPI
+    kpis = result["kpis"][0] if result["kpis"] else {}
 
     return {
         "kpis": kpis,
-        "revenue_trend": revenue_trend,
-        "category_share": category_share,
-        "top_skus": top_skus,
-        "state_heatmap": state_heatmap,
-        "customer_analytics": customer_analytics,
-        "profit_analytics": profit_analytics,
-        "fulfillment_analytics": fulfillment_analytics
+        "revenue_trend": result["revenue_trend"],
+        "category_share": result["category_share"],
+        "top_skus": result["top_skus"],
+        "state_heatmap": result["state_heatmap"],
+        "customer_analytics": result["customer_analytics"],
+        "profit_analytics": result["profit_analytics"],
+        "fulfillment_analytics": result["fulfillment_analytics"]
     }

@@ -1,5 +1,6 @@
 fastapi
 uvicorn
 pymongo
-pandas
 python-dotenv
+pandas
+openpyxl

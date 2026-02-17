@@ -1,6 +1,6 @@
 from pymongo import MongoClient
-import os
 from dotenv import load_dotenv
+import os
 
 load_dotenv()
 
@@ -14,7 +14,7 @@ def db_connect():
     if _db is None:
         MONGO_URI = os.getenv("MONGO_URI")
         _client = MongoClient(MONGO_URI)
-        _db = _client["amazon_sales_db"]
+        _db = _client["AmazonSales"]
 
     return _db
 

@@ -15,5 +15,5 @@ def insert_initial_data():
     print("Data inserted successfully")
 
 
-if __name__ == "__main__":
-    insert_initial_data()
+# if __name__ == "__main__":
+#     insert_initial_data()

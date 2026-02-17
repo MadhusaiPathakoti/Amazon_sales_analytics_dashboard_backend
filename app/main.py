@@ -1,6 +1,6 @@
 from fastapi import FastAPI
-from app.routes.analytics import router
+from app.routes.dashboard import router as dashboard_router
 
-app = FastAPI(title="Amazon Analytics API")
+app = FastAPI()
 
-app.include_router(router)
+app.include_router(dashboard_router)
